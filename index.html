@@ -22,39 +22,32 @@
             padding: 8px 16px; border-radius: 12px; font-weight: 600; cursor: pointer;
         }
         .addr-bar {
-            background: #1c1c1e; border-radius: 12px; padding: 10px;
-            display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+            background: #1c1c1e; border-radius: 12px; padding: 12px 10px;
+            margin-bottom: 12px;
         }
-        .addr-label { font-size: 13px; color: #8e8e93; flex: 1; }
-        
-        /* SA 선택 select 너비 조정 */
+        .addr-row {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+        }
+        .addr-label { font-size: 13px; color: #8e8e93; flex: 1; min-width: 80px; }
         select { 
             background: #2c2c2e; color: white; border: none; 
             padding: 8px 12px; border-radius: 8px;
-            max-width: 220px; /* 메뉴가 많아져서 너비 확보 */
+            flex: 1; max-width: 220px;
         }
-        
-        .set-btn { background: #333; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+        .custom-addr {
+            background: #2c2c2e; color: white; border: none;
+            padding: 8px 12px; border-radius: 8px;
+            width: 90px; text-align: center;
+            font-size: 15px;
+        }
+        .custom-addr::placeholder { color: #666; }
+        .set-btn { background: #333; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
 
         #gauge-container { position: relative; width: 320px; height: 320px; margin: 0 auto 16px; }
-        
-        /* [지시사항 반영] Target RPM 디지털 숫자 스타일 수정 */
         #target-rpm {
-            position: absolute; 
-            /* 위치 조정: 기존 68%에서 글자 크기만큼 아래로 내림 */
-            top: 77.5%; /* 기존 위치에서 약 42px 아래로 이동 */
-            left: 50%; 
-            transform: translate(-50%, -50%);
-            
-            /* [지시사항 반영] 글자 크기 조정: 기존 42px의 70% */
-            font-size: 29.4px; /* 42px * 0.7 */
-            
-            font-weight: 700; 
-            color: #fff; 
-            pointer-events: none;
-            z-index: 10; /* 바늘 위에 오도록 설정 */
+            position: absolute; top: 77.5%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 29.4px; font-weight: 700; color: #fff; pointer-events: none; z-index: 10;
         }
-        
         .baud-bar { display: flex; gap: 10px; margin: 12px 0; }
         .baud-btn {
             flex: 1; background: #1c1c1e; color: #8e8e93; border: none;
@@ -80,23 +73,29 @@
     </div>
 
     <div class="addr-bar">
-        <span class="addr-label">ENGINE SA</span>
-        
-        <select id="sourceAddr">
-            <optgroup label="Popular">
-                <option value="229">Mack (0xE5) - Default</option>
-                <option value="242">Cummins (0xF2)</option>
-                <option value="231">Detroit (0xE7)</option>
-            </optgroup>
-            <optgroup label="Other Manufacturers">
-                <option value="3">Detroit/PACCAR/Intl (0x03)</option>
-                <option value="7">Cummins/PACCAR (0x07)</option>
-                <option value="11">Volvo/PACCAR (0x0B)</option>
-                <option value="33">Body Controller (0x21)</option>
-                <option value="39">Volvo Custom (0x27)</option>
-            </optgroup>
-        </select>
-        
+        <div class="addr-row">
+            <span class="addr-label">ENGINE SA</span>
+            
+            <select id="sourceAddrSelect">
+                <optgroup label="Popular">
+                    <option value="229">Mack (0xE5) - Default</option>
+                    <option value="242">Cummins (0xF2)</option>
+                    <option value="231">Detroit (0xE7)</option>
+                </optgroup>
+                <optgroup label="Other Manufacturers">
+                    <option value="3">Detroit/PACCAR/Intl (0x03)</option>
+                    <option value="7">Cummins/PACCAR (0x07)</option>
+                    <option value="11">Volvo/PACCAR (0x0B)</option>
+                    <option value="33">Body Controller (0x21)</option>
+                    <option value="39">Volvo Custom (0x27)</option>
+                </optgroup>
+            </select>
+
+            <input type="number" id="customAddr" class="custom-addr" 
+                   min="0" max="255" placeholder="직접 입력" 
+                   inputmode="numeric" pattern="[0-9]*">
+        </div>
+
         <button class="set-btn" onclick="setAddress()">SET</button>
     </div>
 
@@ -123,7 +122,6 @@
     const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
     const CHAR_UUID    = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-    // Grok의 고해상도 게이지 디자인 보존
     const gauge = new RadialGauge({
         renderTo: 'gauge-rpm',
         width: 320, height: 320, minValue: 0, maxValue: 3000,
@@ -131,10 +129,9 @@
         highlights: [{ from: 2500, to: 3000, color: "rgba(255,59,48,0.7)" }],
         colorPlate: "#000", colorMajorTicks: "#ddd", colorNumbers: "#ccc",
         needleType: "arrow", needleWidth: 4, needleColor: "#ff69b4",
-        valueBox: false, borderShadowWidth: 0, animationDuration: 200, zIndex: 5 /* 숫자보다 아래에 오도록 설정 */
+        valueBox: false, borderShadowWidth: 0, animationDuration: 200
     }).draw();
 
-    // Target RPM 아크 보존
     function updateArc(target) {
         gauge.update({
             highlights: [
@@ -144,10 +141,10 @@
         });
     }
 
-    // BLE 통신 로직 보존
     async function toggleConnect() {
         if (bleDevice && bleDevice.gatt.connected) {
             await bleDevice.gatt.disconnect();
+            updateStatus(false);
             return;
         }
         try {
@@ -163,7 +160,10 @@
             bleChar.addEventListener('characteristicvaluechanged', handleNotify);
             
             updateStatus(true);
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            updateStatus(false);
+        }
     }
 
     function updateStatus(connected) {
@@ -174,7 +174,6 @@
         b.innerText = connected ? "DISCONNECT" : "CONNECT";
     }
 
-    // 데이터 패킷 해석 로직 보존 (5바이트)
     function handleNotify(event) {
         const dv = event.target.value;
         if (dv.byteLength < 5) return;
@@ -191,20 +190,37 @@
         document.getElementById('baud500').classList.toggle('active', is500);
     }
 
-    // 명령 전송 로직 보존 (2바이트)
     async function sendCommand(val) {
-        if (!bleChar) return;
+        if (!bleChar) return alert("먼저 CONNECT 해주세요.");
         const buf = new Uint8Array([val & 0xFF, (val >> 8) & 0xFF]);
         await bleChar.writeValue(buf);
     }
 
-    function changeBaud(kbps) { sendCommand(kbps === 500 ? 0x5000 : 0x2500); }
-    
-    // SA 설정 로직 보존
+    function changeBaud(kbps) {
+        sendCommand(kbps === 500 ? 0x5000 : 0x2500);
+    }
+
     function setAddress() {
-        const addr = parseInt(document.getElementById('sourceAddr').value);
-        // Grok 웹 프로토콜 규격 보존 (0xA5XX)
+        const customInput = document.getElementById('customAddr').value.trim();
+        let addr;
+
+        // 1. 직접 입력값이 있으면 우선 사용
+        if (customInput !== "") {
+            addr = parseInt(customInput);
+            if (isNaN(addr) || addr < 0 || addr > 255) {
+                alert("0 ~ 255 사이의 숫자를 입력해주세요.");
+                return;
+            }
+        } 
+        // 2. 입력이 없으면 select 값 사용
+        else {
+            addr = parseInt(document.getElementById('sourceAddrSelect').value);
+        }
+
         sendCommand(0xA500 | addr);
+        
+        // 입력 후 필드 초기화 (선택사항)
+        // document.getElementById('customAddr').value = "";
     }
 </script>
 </body>

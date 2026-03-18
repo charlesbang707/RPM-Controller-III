@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J1939 RPM Control</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --accent-blue: #2196F3;
+            --btn-resume: #4CAF50;
+            --btn-stop: #F44336;
+            --btn-up: #2196F3;
+            --btn-down: #FF9800;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 1. 상단 상태 및 연결 */
+        .header {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        #status-text { color: #F44336; font-weight: bold; }
+        #status-text.connected { color: #4CAF50; }
+        .btn-connect {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        /* 2. Source Address 설정 */
+        .addr-config {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            width: 90%;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        select, .btn-set {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            background: #333;
+            color: white;
+        }
+        .btn-set { background: #555; max-width: 60px; }
+
+        /* 3 & 4. 게이지 영역 (Arc & Analog) */
+        .gauge-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .gauge-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .target-arc {
+            fill: none;
+            stroke: var(--accent-blue);
+            stroke-width: 15;
+            stroke-dasharray: 0 1000;
+            transition: stroke-dasharray 0.3s ease;
+        }
+        .gauge-bg { fill: none; stroke: #333; stroke-width: 2; }
+        .needle {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 2px; height: 120px;
+            background: #fff;
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%) rotate(0deg);
+            transition: transform 0.2s ease-out;
+        }
+
+        /* 5. RPM 숫자 표시 */
+        .rpm-display { text-align: center; margin-bottom: 20px; }
+        .current-rpm { font-size: 64px; font-weight: bold; margin: 0; }
+        .target-rpm-digital { color: var(--accent-blue); font-size: 24px; margin-top: -10px; }
+
+        /* 6. Baud Rate 선택 */
+        .baud-rate { display: flex; gap: 10px; margin-bottom: 30px; }
+        .baud-btn {
+            background: #333; border: 1px solid #444; color: #888;
+            padding: 10px 25px; border-radius: 5px; cursor: pointer;
+        }
+        .baud-btn.active { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+        /* 7. 제어 버튼 그리드 */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 90%;
+        }
+        .ctrl-btn {
+            padding: 25px;
+            border-radius: 12px;
+            border: none;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .resume { background: var(--btn-resume); }
+        .up { background: var(--btn-up); }
+        .stop { background: var(--btn-stop); }
+        .down { background: var(--btn-down); }
+
+        .footer { margin-top: auto; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span id="status-text">DISCONNECTED</span>
+        <button class="btn-connect" id="connectBtn">CONNECT</button>
+    </div>
+
+    <div class="addr-config">
+        <select id="sourceAddr">
+            <option value="0xE5">Default (0xE5)</option>
+            <option value="0x80">Custom (0x80)</option>
+        </select>
+        <button class="btn-set">SET</button>
+    </div>
+
+    <div class="gauge-container">
+        <svg class="gauge-svg" viewBox="0 0 100 100">
+            <circle class="gauge-bg" cx="50" cy="50" r="45" />
+            <circle id="targetArc" class="target-arc" cx="50" cy="50" r="45" pathLength="1000" />
+        </svg>
+        <div id="needle" class="needle"></div>
+    </div>
+
+    <div class="rpm-display">
+        <p class="current-rpm" id="curRpmText">0</p>
+        <p>CURRENT RPM</p>
+        <div class="target-rpm-digital" id="tarRpmText">Target: 0</div>
+    </div>
+
+    <div class="baud-rate">
+        <button class="baud-btn active" onclick="setBaud(250)">250 kbps</button>
+        <button class="baud-btn" onclick="setBaud(500)">500 kbps</button>
+    </div>
+
+    <div class="controls">
+        <button class="ctrl-btn resume" onclick="sendCmd(1)">RESUME</button>
+        <button class="ctrl-btn up" onclick="sendCmd(2)">UP</button>
+        <button class="ctrl-btn stop" onclick="sendCmd(3)">STOP</button>
+        <button class="ctrl-btn down" onclick="sendCmd(4)">DOWN</button>
+    </div>
+
+    <div class="footer">charlesbang707.github.io</div>
+
+    <script>
+        let bleDevice, bleChar;
+        const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const charUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+        async function connectBLE() {
+            try {
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'Truck_RPM_Control' }],
+                    optionalServices: [serviceUuid]
+                });
+                
+                const server = await bleDevice.gatt.connect();
+                const service = await server.getPrimaryService(serviceUuid);
+                bleChar = await service.getCharacteristic(charUuid);
+
+                await bleChar.startNotifications();
+                bleChar.addEventListener('characteristicvaluechanged', handleData);
+                
+                document.getElementById('status-text').innerText = 'CONNECTED';
+                document.getElementById('status-text').classList.add('connected');
+                document.getElementById('connectBtn').innerText = 'DISCONNECT';
+            } catch (error) { console.log(error); }
+        }
+
+        function handleData(event) {
+            const data = event.target.value;
+            // Byte 0-1: Current RPM, Byte 2-3: Target RPM
+            const curRpm = data.getUint16(0, true);
+            const tarRpm = data.getUint16(2, true);
+
+            // UI 업데이트
+            document.getElementById('curRpmText').innerText = curRpm;
+            document.getElementById('tarRpmText').innerText = `Target: ${tarRpm}`;
+            
+            // 게이지 바늘 (0~3000 RPM 기준 약 -135도 ~ 135도)
+            const angle = (curRpm / 3000) * 270 - 135;
+            document.getElementById('needle').style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+
+            // Target Arc 업데이트 (pathLength 1000 기준)
+            const arcVal = (tarRpm / 3000) * 1000;
+            document.getElementById('targetArc').style.strokeDasharray = `${arcVal} 1000`;
+        }
+
+        async function sendCmd(val) {
+            if (!bleChar) return;
+            const data = new Uint8Array([val]);
+            await bleChar.writeValue(data);
+        }
+
+        function setBaud(rate) {
+            document.querySelectorAll('.baud-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            sendCmd(rate === 250 ? 5 : 6); // 예시 커맨드
+        }
+
+        document.getElementById('connectBtn').onclick = () => {
+            if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+            else connectBLE();
+        };
+    </script>
+</body>
+</html>
